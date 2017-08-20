@@ -1,5 +1,10 @@
 const path = require('path');
 const webpack = require('webpack');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+
+const PATHS = {
+  src: path.resolve(__dirname, 'src'),
+};
 
 const config = {
   entry: [
@@ -10,38 +15,40 @@ const config = {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.js',
   },
+  plugins: [
+    new HtmlWebpackPlugin({
+      title: 'Map Maker',
+      template: 'src/index.ejs',
+      // favicon: 'src/favicon.ico',
+      inject: 'body',
+    }),
+  ],
   module: {
     loaders: [
       {
-        loader: 'babel-loader',
-
-        // Skip any files outside of your project's `src` directory
-        include: [
-          path.resolve(__dirname, 'src'),
-        ],
-
-        // Only run `.js` and `.jsx` files through Babel
         test: /\.js$/,
-
-        // Options to configure babel with
+        loader: 'babel-loader',
+        include: PATHS.src,
         query: {
           presets: ['es2015', 'stage-0'],
         },
+      }, {
+        test: /\.scss$/,
+        loaders: ['style-loader', 'css-loader', 'sass-loader'],
+        include: PATHS.src,
       },
     ],
   },
 };
 
 if (process.env.NODE_ENV !== 'development') {
-  config.plugins = [
-    new webpack.optimize.UglifyJsPlugin({
-      minimize: true,
-      compressor: {
-        warnings: false,
-        screw_ie8: true,
-      },
-    }),
-  ];
+  config.plugins.push(new webpack.optimize.UglifyJsPlugin({
+    minimize: true,
+    compressor: {
+      warnings: false,
+      screw_ie8: true,
+    },
+  }));
 }
 
 module.exports = config;

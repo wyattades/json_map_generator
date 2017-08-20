@@ -6,9 +6,11 @@
     "__DEV__": true,
     "window": true,
     "document": true,
-    "fetch": true
+    "fetch": true,
+    "alert": true
   },
   "rules": {
+    "no-alert": 0,
     "no-extend-native": 0,
     "no-mixed-operators": 0,
     "arrow-parens": 0,

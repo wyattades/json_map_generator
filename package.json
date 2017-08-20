@@ -1,26 +1,37 @@
 {
-  "name": "starter_project",
+  "name": "map_maker",
   "version": "1.0.0",
-  "description": "",
+  "description": "Make maps and export to JSON",
   "main": "index.js",
   "scripts": {
     "build": "node ./node_modules/webpack/bin/webpack.js --progress -p --profile --colors",
     "dev": "export NODE_ENV=development && node server.js",
     "deploy": "aws s3 cp dist s3://wyattades.com/map_maker --recursive"
   },
-  "author": "",
-  "license": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wyattades/json_map_generator"
+  },
+  "author": "Wyatt Ades",
+  "license": "MIT",
   "devDependencies": {
     "babel-core": "^6.26.0",
     "babel-eslint": "^7.2.3",
     "babel-loader": "^7.1.1",
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-stage-0": "^6.24.1",
+    "css-loader": "^0.28.5",
     "eslint": "^4.4.1",
     "eslint-config-airbnb": "^15.1.0",
     "eslint-plugin-import": "^2.7.0",
     "eslint-plugin-jsx-a11y": "^5.1.1",
     "eslint-plugin-react": "^7.2.1",
+    "file-loader": "^0.11.2",
+    "html-webpack-plugin": "^2.30.1",
+    "node-sass": "^4.5.3",
+    "sass-loader": "^6.0.6",
+    "style-loader": "^0.18.2",
+    "url-loader": "^0.5.9",
     "webpack": "^3.5.5",
     "webpack-dev-server": "^2.7.1"
   },
