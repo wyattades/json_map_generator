@@ -63,6 +63,8 @@ let keys = {
   plus: 0,
 };
 
+const roundSnap = val => Math.round(val / snap) * snap;
+
 const render = () => {
 
   p.noStroke();
@@ -173,16 +175,24 @@ const deleteSelected = () => {
 const setDragging = obj => {
   dragging = {
     obj,
-    offsetX: p.mouseX - obj.x,
-    offsetY: p.mouseY - obj.y,
+    offsetX: hover.x - obj.x,
+    offsetY: hover.y - obj.y,
+    mOffsetX: p.mouseX - obj.x,
+    mOffsetY: p.mouseY - obj.y,
   };
 };
 
 const dragObject = () => {
-  const { obj: d, offsetX, offsetY } = dragging;
-  
-  d.x = Math.round((p.mouseX - offsetX) / snap) * snap;
-  d.y = Math.round((p.mouseY - offsetY) / snap) * snap;
+  const { obj: d, offsetX, offsetY, mOffsetX, mOffsetY } = dragging;
+
+  // if dragging.obj is not transform
+  if (d.w !== undefined || d.dx !== undefined) {
+    d.x = roundSnap(hover.x - offsetX);
+    d.y = roundSnap(hover.y - offsetY);
+  } else {
+    d.x = roundSnap(p.mouseX - mOffsetX);
+    d.y = roundSnap(p.mouseY - mOffsetY);
+  }
   
   // if dragging.obj is a node
   if (d.dx !== undefined) {
@@ -211,8 +221,8 @@ const createOutput = () => {
 
 const createObject = () => {
   const obj = {
-    x: -translate.x + Math.round(p.width / 2 / snap) * snap,
-    y: -translate.y + Math.round(p.height / 2 / snap) * snap,
+    x: -translate.x + roundSnap(p.width / 2),
+    y: -translate.y + roundSnap(p.height / 2),
     w: snap * 5,
     h: snap * 3,
   };
@@ -262,8 +272,8 @@ const update = () => {
   
   hover.x = (p.mouseX - translate.x) / zoom;
   hover.y = (p.mouseY - translate.y) / zoom;
-  hover.rx = Math.round(hover.x / snap) * snap;
-  hover.ry = Math.round(hover.y / snap) * snap;
+  hover.rx = roundSnap(hover.x);
+  hover.ry = roundSnap(hover.y);
 
   if (dragging.obj) {
     dragObject();
