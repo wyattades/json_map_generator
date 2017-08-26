@@ -30,7 +30,7 @@ const config = {
         loader: 'babel-loader',
         include: PATHS.src,
         query: {
-          presets: ['es2015', 'stage-0'],
+          presets: ['react', 'es2015', 'stage-0'],
         },
       }, {
         test: /\.scss$/,

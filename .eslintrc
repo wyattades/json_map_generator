@@ -10,6 +10,7 @@
     "alert": true
   },
   "rules": {
+    "react/no-array-index-key": 0,
     "no-alert": 0,
     "no-extend-native": 0,
     "no-mixed-operators": 0,

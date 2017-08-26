@@ -1,7 +1,12 @@
 import 'p5';
 import 'p5/lib/addons/p5.dom';
+import Joi from 'joi-browser';
+import React from 'react';
+import ReactDOM from 'react-dom';
 
 import './style.scss';
+import InteractiveMap from './interactiveMap';
+import ObjectsMenu from './objectsMenu';
 
 const p = window;
 
@@ -25,34 +30,31 @@ Array.prototype.move = function move(old_index, new_index) {
   }
 };
 
+const hexColorSchema = Joi.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Hex Color');
+
+const objectSchema = Joi.object().keys({
+  x: Joi.number().required(),
+  y: Joi.number().required(),
+  w: Joi.number().required(),
+  h: Joi.number().required(),
+  color: hexColorSchema,
+}).required();
+
+const arraySchema = Joi.array().items(objectSchema).required();
+
+const resultSchema = Joi.object().pattern(/.*/, Joi.object().keys({
+  color: hexColorSchema.default('#FFF'),
+  objects: arraySchema.required(),
+})).required();
+
 // Constants
 const DOM_ID = 'canvas';
 
 // Variables
-let snap = 15;
-let zoom = 1.0;
-let translate = {
-  x: snap * 4,
-  y: snap * 4,
-};
-let hover = {
-  x: 0,
-  y: 0,
-  rx: 0,
-  ry: 0,
-};
+let map;
 let canvas;
 let objects = [];
-let dragging = {};
-let hovering = null;
-let selected = {
-  nodes: [
-    { dx: 0, dy: 0 },
-    { dx: 0, dy: 1 },
-    { dx: 1, dy: 0 },
-    { dx: 1, dy: 1 },
-  ],
-};
+let result = {};
 let dom = {};
 let keys = {
   left: 0,
@@ -63,172 +65,39 @@ let keys = {
   plus: 0,
 };
 
-const roundSnap = val => Math.round(val / snap) * snap;
-
-const render = () => {
-
-  p.noStroke();
-  p.fill(255, 0, 0);
-  p.ellipse(hover.rx, hover.ry, 2, 2);
-
-  p.stroke(0);
-  
-  for (let o of objects) {
-    if (selected.obj === o) {
-      p.strokeWeight(3);
-    } else {
-      p.strokeWeight(1);
-    }
-    
-    if (dragging.obj === o) {
-      p.fill(190, 0, 0);
-    } else if (hovering === o) {
-      p.fill(220, 0, 0);
-    } else {
-      p.fill(255, 0, 0);
-    }
-    
-    p.rect(o.x, o.y, o.w, o.h);
-  }
-  
-  if (selected.obj) {
-    p.strokeWeight(1);
-    
-    const NODE = 6 / zoom;
-    
-    for (let n of selected.nodes) {
-      if (dragging.obj === n) {
-        p.fill(160);
-      } else if (hovering === n) {
-        p.fill(200);
-      } else {
-        p.fill(255);
-      }
-      
-      p.ellipse(n.x, n.y, NODE, NODE);
-    }
-  }
-};
-
-const getHovering = () => {
-
-  const NODE = 6 / zoom;
-  
-  if (dragging.obj) {
-    return dragging.obj;
-  }
-  
-  const mx = hover.x,
-        my = hover.y,
-        s = selected.obj;
-  
-  if (s) {
-    for (let n of selected.nodes) {
-      const x = s.x + n.dx * s.w,
-            y = s.y + n.dy * s.h;
-      if (((mx - x) * (mx - x) + (my - y) * (my - y)) < NODE * NODE) {
-        return n;
-      }
-    }
-  }
-  
-  // Reverse iterate because the last elements should be hovered first
-  // because they are displayed first
-  for (let i = objects.length - 1; i >= 0; i--) {
-    const o = objects[i];
-    
-    if (mx > o.x && mx < o.x + o.w && my > o.y && my < o.y + o.h) {
-      return o;
-    }
-  }
-  
-  return null;
-};
-
-const updateNodes = () => {
-  const o = selected.obj;
-  
-  for (let n of selected.nodes) {
-    n.x = o.x + n.dx * o.w;
-    n.y = o.y + n.dy * o.h;
-  }
-};
-
 const setSelected = obj => {
-  selected.obj = obj;
+  map.setSelected(obj);
 
   if (!obj) {
     dom.objectDialog.style.display = 'none';
   } else {
     dom.objectDialog.style.display = 'flex';
-    updateNodes();
+  }
+};
+
+const createOutput = () => {
+  try {
+    dom.output.value = JSON.stringify(result);
+  } catch (err) {
+    alert(err);
   }
 };
 
 const deleteSelected = () => {
-  if (selected.obj) {
-    objects = objects.filter(o => o !== selected.obj);
+  if (map.selected.obj) {
+    objects = objects.filter(o => o !== map.selected.obj);
     setSelected(null);
   }
 };
 
-const setDragging = obj => {
-  dragging = {
-    obj,
-    offsetX: hover.x - obj.x,
-    offsetY: hover.y - obj.y,
-    mOffsetX: p.mouseX - obj.x,
-    mOffsetY: p.mouseY - obj.y,
-  };
-};
+const createObject = obj => {
+  objectSchema.validate(obj, (err, _obj) => {
+    obj = err ? map.getNewObject() : _obj;
 
-const dragObject = () => {
-  const { obj: d, offsetX, offsetY, mOffsetX, mOffsetY } = dragging;
-
-  // if dragging.obj is not transform
-  if (d.w !== undefined || d.dx !== undefined) {
-    d.x = roundSnap(hover.x - offsetX);
-    d.y = roundSnap(hover.y - offsetY);
-  } else {
-    d.x = roundSnap(p.mouseX - mOffsetX);
-    d.y = roundSnap(p.mouseY - mOffsetY);
-  }
-  
-  // if dragging.obj is a node
-  if (d.dx !== undefined) {
+    objects.push(obj);
     
-    // This was a pain to figure out
-    const op = num => num === 0 ? 1 : 0;
-    const sn = num => num === 0 ? -1 : 1;
-
-    const o = selected.obj;
-    
-    o.w = o.x * sn(op(d.dx)) + d.x * sn(d.dx) + o.w * op(d.dx);
-    o.h = o.y * sn(op(d.dy)) + d.y * sn(d.dy) + o.h * op(d.dy);
-    o.x = d.x * op(d.dx) + o.x * d.dx;
-    o.y = d.y * op(d.dy) + o.y * d.dy;
-  }
-  
-};
-
-const createOutput = () => {
-  dom.output.value = JSON.stringify(
-    objects.map(({ x, y, w, h }) => ({
-      x, y, w, h,
-    })),
-  );
-};
-
-const createObject = () => {
-  const obj = {
-    x: -translate.x + roundSnap(p.width / 2),
-    y: -translate.y + roundSnap(p.height / 2),
-    w: snap * 5,
-    h: snap * 3,
-  };
-  objects.push(obj);
-
-  setSelected(obj);
+    setSelected(obj);
+  });
 };
 
 const bindElement = (id, action) => {
@@ -255,42 +124,11 @@ const bindInput = (id, value, onSave) => bindElement(id, el => {
   el.blur = () => onSave(el.value);
 });
 
-const changeZoom = delta => {
-  const old_zoom = zoom;
-  zoom = p.constrain(zoom + delta, 0.3, 2.0);
-
-  if (old_zoom !== zoom) {
-    translate.x = p.mouseX - hover.x * zoom;
-    translate.y = p.mouseY - hover.y * zoom;
-  }
-};
-
-const update = () => {
-  translate.x -= (keys.right - keys.left) * snap;
-  translate.y -= (keys.down - keys.up) * snap;
-  changeZoom((keys.plus - keys.minus) * 0.01);
-  
-  hover.x = (p.mouseX - translate.x) / zoom;
-  hover.y = (p.mouseY - translate.y) / zoom;
-  hover.rx = roundSnap(hover.x);
-  hover.ry = roundSnap(hover.y);
-
-  if (dragging.obj) {
-    dragObject();
-    if (selected.obj) {
-      updateNodes();
-    }
-  }
-  
-  hovering = getHovering();
-};
-
-
 const mousePressed = () => {
-  if (selected.obj) {
-    for (let n of selected.nodes) {
-      if (hovering === n) {
-        setDragging(n);
+  if (map.selected.obj) {
+    for (let n of map.selected.nodes) {
+      if (map.hovering === n) {
+        map.setDragging(n);
         return;
       }
     }
@@ -299,24 +137,24 @@ const mousePressed = () => {
   for (let i = objects.length - 1; i >= 0; i--) {
     let o = objects[i];
     
-    if (hovering === o) {
+    if (map.hovering === o) {
       objects.move(i, objects.length);
       
       setSelected(o);
-      setDragging(o);
+      map.setDragging(o);
       return;
     }
   }
   
-  setDragging(translate);
+  map.setDragging(map.translate);
   setSelected(null);
 };
 
 const mouseReleased = () => {
-  dragging.obj = null;
+  map.setDragging(null);
 };
 
-const mouseWheel = ({ deltaY }) => changeZoom(deltaY * -0.002);
+const mouseWheel = ({ deltaY }) => map.zoom(deltaY * -0.002);
 
 p.keyPressed = () => {
   switch (p.keyCode) {
@@ -352,45 +190,65 @@ p.setup = () => {
   canvas.mouseReleased(mouseReleased);
   canvas.mouseWheel(mouseWheel);
 
+  map = new InteractiveMap(p.width, p.height);
+
   dom = {
     grid: document.getElementById('grid'),
     output: document.getElementById('json-rep'),
     objectDialog: document.getElementById('object-dialog'),
+    // objectsMenu: document.getElementById('objects-menu'),
   };
 
-  bindInput('input-snap', snap, val => {
-    snap = parseInt(val, 10);
+  // ReactDOM.render(<ObjectsMenu result={result}/>, dom.objectsMenu);
+
+  bindInput('input-snap', map.snap, val => {
+    map.snap = parseInt(val, 10);
   });
   
   bindButton('btn-delete', deleteSelected);
-  bindButton('btn-create', createObject);
+  bindButton('btn-create', () => createObject());
   bindButton('btn-export', createOutput);
   bindButton('btn-import', () => {
     setSelected(null);
     
-    const correctJSON = dom.output.value.replace(/(['"])?([a-z0-9A-Z_]+)(['"])?:/g, '"$2":');
+    let newResult;
+
     try {
-      objects = JSON.parse(correctJSON);
-      if (!Array.isArray(objects)) {
-        alert('JSON must be an array');
-        objects = [];
-        dom.output.value = correctJSON;
-      }
+      newResult = JSON.parse(dom.output.value.replace(/(['"])?([a-z0-9A-Z_]+)(['"])?:/g, '"$2":'));
     } catch (e) {
       alert('Invalid JSON provided');
+      return;
     }
+
+    if (Array.isArray(newResult)) {
+      newResult = {
+        default: {
+          objects: newResult,
+        },
+      };
+    }
+
+    resultSchema.validate(newResult, (err, _result) => {
+      if (err) {
+        alert('Invalid object structure provided');
+      } else {
+        result = _result;
+        dom.output.value = JSON.stringify(result);
+      }
+    });
   });
   bindButton('btn-duplicate', () => {
-    const copy = Object.assign({}, selected.obj);
-    copy.x += snap;
-    copy.y += snap;
-    objects.push(copy);
-    setSelected(copy);
+    const copy = Object.assign({}, map.selected.obj);
+    copy.x += map.snap;
+    copy.y += map.snap;
+
+    createObject(copy);
   });
     
   p.ellipseMode(p.RADIUS);
   p.textSize(20);
   p.textAlign(p.RIGHT, p.BOTTOM);
+  p.colorMode(p.HSB, 255);
 
   setSelected(null);
 };
@@ -398,14 +256,16 @@ p.setup = () => {
 p.draw = () => {
   
   // UPDATE
-  update();
+  map.updateCursor(p.mouseX, p.mouseY, objects);
+  map.pan(keys.right - keys.left, keys.down - keys.up);
+  map.zoom((keys.plus - keys.minus) * 0.02);
 
-  const size = 1000 * zoom * snap;
+  const size = 1000 * map.translate.z * map.snap;
   dom.grid.setAttribute('style', `
     width: ${size}px;
     height: ${size}px;
-    left: ${-size * 0.5 + translate.x}px;
-    top: ${-size * 0.5 + translate.y}px;
+    left: ${-size * 0.5 + map.translate.x}px;
+    top: ${-size * 0.5 + map.translate.y}px;
   `);
   
   // RENDER
@@ -413,17 +273,18 @@ p.draw = () => {
   
   p.push();
   // p.translate(-translate.x / 2, -translate.y / 2);
-  p.translate(translate.x, translate.y);
-  p.scale(zoom);
+  p.translate(map.translate.x, map.translate.y);
+  p.scale(map.translate.z);
 
-  render();
+  map.render(p, objects);
   p.pop();
 
   p.fill(0);
-  p.text(`(x: ${hover.rx}, y: ${hover.ry})`, p.width - 5, p.height - 5);
+  p.text(`(x: ${map.hover.rx}, y: ${map.hover.ry})`, p.width - 5, p.height - 5);
 
 };
 
 window.onresize = () => {
   canvas.size(p.innerWidth, p.innerHeight);
+  map.size(canvas.width, canvas.height);
 };

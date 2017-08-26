@@ -37,6 +37,11 @@
   },
   "dependencies": {
     "babel-polyfill": "^6.26.0",
-    "p5": "^0.5.12"
+    "babel-preset-react": "^6.24.1",
+    "joi": "^10.6.0",
+    "joi-browser": "^10.6.1",
+    "p5": "^0.5.12",
+    "react": "^15.6.1",
+    "react-dom": "^15.6.1"
   }
 }
