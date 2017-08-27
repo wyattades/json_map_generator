@@ -1,6 +1,7 @@
 const path = require('path');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 
 const PATHS = {
   src: path.resolve(__dirname, 'src'),
@@ -8,9 +9,17 @@ const PATHS = {
 
 const config = {
   entry: [
-    'babel-polyfill',
     './src/index',
   ],
+  // Allows us to use 'joi' node module
+  node: {
+    Buffer: true,
+    fs: 'empty',
+    net: 'empty',
+    tls: 'empty',
+    crypto: 'empty',
+    dns: 'empty',
+  },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.js',
@@ -19,8 +28,12 @@ const config = {
     new HtmlWebpackPlugin({
       title: 'Map Maker',
       template: 'src/index.ejs',
-      // favicon: 'src/favicon.ico',
-      inject: 'body',
+      inject: true,
+    }),
+    new webpack.DefinePlugin({
+      'process.env': {
+        NODE_ENV: JSON.stringify(process.env.NODE_ENV),
+      },
     }),
   ],
   module: {
@@ -42,13 +55,12 @@ const config = {
 };
 
 if (process.env.NODE_ENV !== 'development') {
-  config.plugins.push(new webpack.optimize.UglifyJsPlugin({
-    minimize: true,
-    compressor: {
-      warnings: false,
-      screw_ie8: true,
-    },
+
+  config.plugins.push(new UglifyJsPlugin({
+    parallel: true,
   }));
+
+  config.plugins.push(new webpack.optimize.OccurrenceOrderPlugin());
 }
 
 module.exports = config;

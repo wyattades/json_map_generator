@@ -1,6 +1,6 @@
 import 'p5';
 import 'p5/lib/addons/p5.dom';
-import Joi from 'joi-browser';
+import Joi from 'joi';
 import React from 'react';
 import ReactDOM from 'react-dom';
 
@@ -30,7 +30,7 @@ Array.prototype.move = function move(old_index, new_index) {
   }
 };
 
-const hexColorSchema = Joi.string().regex(/^#([a-f0-9]{6})$/, 'Hex Color');
+const hexColorSchema = Joi.string().regex(/^#[a-f0-9]{6}$/, 'Hex Color');
 
 const objectSchema = Joi.object().keys({
   x: Joi.number().required(),
@@ -39,13 +39,13 @@ const objectSchema = Joi.object().keys({
   h: Joi.number().required(),
   color: hexColorSchema,
   type: Joi.string(),
-}).required();
+});
 
-const arraySchema = Joi.array().items(objectSchema).required();
+const arraySchema = Joi.array().items(objectSchema);
 
-const resultSchema = Joi.object().pattern(/.*/, Joi.object().keys({
+const resultSchema = Joi.object().pattern(/^.*$/, Joi.object().keys({
   color: hexColorSchema.default('#ffffff'),
-  objects: arraySchema.required(),
+  objects: arraySchema.default([]),
 })).required();
 
 // Constants
@@ -55,7 +55,12 @@ const DOM_ID = 'canvas';
 let map;
 let canvas;
 let objects = [];
-let result = {};
+let result = {
+  default: {
+    color: '#ffffff',
+    objects: [],
+  },
+};
 let dom = {};
 let keys = {
   left: 0,
@@ -66,24 +71,10 @@ let keys = {
   plus: 0,
 };
 
-const getDefaultResult = () => {
-  const _keys = Object.keys(result);
-  if (_keys.length > 0) {
-    return _keys[0];
-  } else {
-    const defaultKey = 'default';
-
-    result[defaultKey] = {
-      color: '#ffffff',
-      objects: [],
-    };
-    return defaultKey;
-  }
-};
-
 const createOutput = () => {
+
   try {
-    dom.output.value = JSON.stringify(result);
+    dom.output.value = JSON.stringify(result).replace(/,?\s*"type"\s*:\s*"\w+"/g, '');
   } catch (err) {
     alert(err);
   }
@@ -93,8 +84,16 @@ const setSelected = (obj, type) => {
   map.selected.obj = obj;
   map.selected.type = type || (obj && obj.type) || map.selected.type;
 
+  if (!map.selected.type || !result[map.selected.type]) {
+    map.selected.type = Object.keys(result)[0];
+  }
+
   if (obj) {
     map.updateNodes();
+    dom.objectDialog.style.display = 'flex';
+    dom.revertColor.disabled = !obj.color;
+  } else {
+    dom.objectDialog.style.display = 'none';
   }
 };
 
@@ -106,15 +105,29 @@ const deleteSelected = () => {
 
     setSelected(null);
   }
-  // else if (map.selected.type) {
-  //   objects = objects.filter(o => o.type !== map.selected.type);
-  //   delete result[map.selected.type];
-  // }
+};
+
+const deleteType = type => {
+  if (Object.keys(result).length <= 1) {
+    alert('Cannot delete: You must have atleast one type of object');
+  } else {
+    delete result[type];
+    objects = objects.filter(o => o.type !== type);
+
+    if (map.selected.type === type) {
+      setSelected(null);
+    }
+  }
 };
 
 const createObject = obj => {
   obj = obj || map.getNewObject();
   obj.type = obj.type || map.selected.type;
+
+  obj.x = Math.round(obj.x);
+  obj.y = Math.round(obj.y);
+  obj.w = Math.round(obj.w);
+  obj.h = Math.round(obj.h);
 
   objects.push(obj);
   result[obj.type].objects.push(obj);
@@ -161,7 +174,7 @@ const bindInput = (id, value, onSave) => bindElement(id, el => {
       el.blur();
     }
   };
-  el.blur = () => onSave(el.value);
+  el.onblur = () => onSave(el.value);
 });
 
 const mousePressed = () => {
@@ -238,6 +251,7 @@ p.setup = () => {
     objectDialog: document.getElementById('object-dialog'),
     objectsMenu: document.getElementById('objects-menu'),
     colorPicker: document.getElementById('color-object'),
+    revertColor: document.getElementById('btn-revert-color'),
   };
 
   bindInput('input-snap', map.snap, val => {
@@ -248,8 +262,9 @@ p.setup = () => {
   bindButton('btn-create-object', () => createObject());
   bindButton('btn-export', createOutput);
   bindButton('btn-create-type', createType);
-  bindButton('btn-revert-color', () => {
+  bindButton(dom.revertColor, () => {
     delete map.selected.obj.color;
+    dom.revertColor.disabled = true;
   });
   bindButton('btn-import', () => {
     setSelected(null);
@@ -266,6 +281,7 @@ p.setup = () => {
     if (Array.isArray(newResult)) {
       newResult = {
         default: {
+          color: '#ffffff',
           objects: newResult,
         },
       };
@@ -273,11 +289,24 @@ p.setup = () => {
 
     resultSchema.validate(newResult, (err, _result) => {
       if (err) {
-        alert('Invalid object structure provided');
+        alert(`Invalid object structure provided:\n${err}`);
       } else {
         result = _result;
-        setSelected(null, getDefaultResult());
+        setSelected(null);
         dom.output.value = JSON.stringify(result);
+        
+        objects = [];
+        const _keys = Object.keys(result);
+        for (let k of _keys) {
+          const _objects = result[k].objects;
+          for (let i = 0; i < _objects.length; i++) {
+            if (!_objects[i].type) {
+              _objects[i].type = k;
+            }
+            objects.push(_objects[i]);
+          }
+        }
+
       }
     });
   });
@@ -289,11 +318,11 @@ p.setup = () => {
     createObject(copy);
   });
     
-  dom.colorPicker.value = null;
   dom.colorPicker.oninput = e => {
     const obj = map.selected.obj;
     if (obj) {
       obj.color = e.target.value;
+      dom.revertColor.disabled = false;
     }
   };
 
@@ -302,13 +331,10 @@ p.setup = () => {
   p.textAlign(p.RIGHT, p.BOTTOM);
   p.colorMode(p.HSB, 255);
 
-  setSelected(null, getDefaultResult());
+  setSelected(null);
 };
 
 p.draw = () => {
-
-  // TEMP
-  dom.objectDialog.style.display = map.selected.obj ? 'flex' : 'none';
   
   // UPDATE
   map.updateCursor(p.mouseX, p.mouseY, objects);
@@ -342,6 +368,7 @@ p.draw = () => {
       result={result}
       selected={map.selected}
       setSelected={setSelected}
+      deleteType={deleteType}
     />,
     dom.objectsMenu,
   );

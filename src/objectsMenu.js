@@ -16,7 +16,7 @@ class ObjectsMenu extends Component {
 
   _ParentItem = ({ type, color }) => {
 
-    const { selected, result } = this.props;
+    const { selected, result, deleteType } = this.props;
 
     const secondarySelected = selected.obj ? 'secondary' : 'selected';
 
@@ -36,7 +36,7 @@ class ObjectsMenu extends Component {
           title="Color"
         />
         <button className="edit" title="Rename" onClick={this._rename(type)}>✎</button>
-        <button className="edit" title="Delete" onClick={this._delete(type)}>␡</button>
+        <button className="edit" title="Delete" onClick={() => deleteType(type)}>␡</button>
       </div>
     );
   };
@@ -54,21 +54,6 @@ class ObjectsMenu extends Component {
         obj.type = newName;
       }
       this.props.setSelected(null, newName);
-
-      delete result[type];
-    }
-  }
-
-  _delete = type => () => {
-    const result = this.props.result;
-    const keys = Object.keys(result);
-
-    if (keys.length <= 1) {
-      alert('Cannot delete: You must have atleast one type of object');
-    } else {
-      if (this.props.selected.type === type) {
-        this.props.setSelected(null, result[Object.keys(result)[0]]);
-      }
 
       delete result[type];
     }

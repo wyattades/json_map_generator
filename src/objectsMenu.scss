@@ -24,6 +24,8 @@
   .menu-item {
     padding: 4px;
 
+    overflow-x: hidden;
+
     display: flex;
     flex-direction: row;
     align-items: center;
