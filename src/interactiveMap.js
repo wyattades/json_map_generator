@@ -50,15 +50,6 @@ class InteractiveMap {
     }
   };
 
-  setSelected = obj => {
-    this.selected.obj = obj;
-
-    if (obj) {
-      this.updateNodes();
-    }
-  }
-
-  // TODO: might need to update width and height
   getNewObject = () => ({
     x: -this.translate.x + this.roundSnap(this.width / 2),
     y: -this.translate.y + this.roundSnap(this.height / 2),
@@ -171,7 +162,7 @@ class InteractiveMap {
     
   };
 
-  render = (p, objects) => {
+  render = (p, objects, result) => {
     
     p.noStroke();
     p.fill(255, 0, 0);
@@ -186,7 +177,7 @@ class InteractiveMap {
         p.strokeWeight(1);
       }
       
-      const color = p.color(o.color || '#FFF');
+      const color = p.color(o.color || result[o.type].color);
       if (this.dragging.obj === o) {
         p.fill(p.hue(color), Math.abs(p.saturation(color) - 100), p.brightness(color));
       } else if (this.hovering === o) {

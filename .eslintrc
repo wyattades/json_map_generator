@@ -7,7 +7,8 @@
     "window": true,
     "document": true,
     "fetch": true,
-    "alert": true
+    "alert": true,
+    "prompt": true
   },
   "rules": {
     "react/no-array-index-key": 0,

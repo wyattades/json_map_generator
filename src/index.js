@@ -30,7 +30,7 @@ Array.prototype.move = function move(old_index, new_index) {
   }
 };
 
-const hexColorSchema = Joi.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Hex Color');
+const hexColorSchema = Joi.string().regex(/^#([a-f0-9]{6})$/, 'Hex Color');
 
 const objectSchema = Joi.object().keys({
   x: Joi.number().required(),
@@ -38,12 +38,13 @@ const objectSchema = Joi.object().keys({
   w: Joi.number().required(),
   h: Joi.number().required(),
   color: hexColorSchema,
+  type: Joi.string(),
 }).required();
 
 const arraySchema = Joi.array().items(objectSchema).required();
 
 const resultSchema = Joi.object().pattern(/.*/, Joi.object().keys({
-  color: hexColorSchema.default('#FFF'),
+  color: hexColorSchema.default('#ffffff'),
   objects: arraySchema.required(),
 })).required();
 
@@ -65,13 +66,18 @@ let keys = {
   plus: 0,
 };
 
-const setSelected = obj => {
-  map.setSelected(obj);
-
-  if (!obj) {
-    dom.objectDialog.style.display = 'none';
+const getDefaultResult = () => {
+  const _keys = Object.keys(result);
+  if (_keys.length > 0) {
+    return _keys[0];
   } else {
-    dom.objectDialog.style.display = 'flex';
+    const defaultKey = 'default';
+
+    result[defaultKey] = {
+      color: '#ffffff',
+      objects: [],
+    };
+    return defaultKey;
   }
 };
 
@@ -83,29 +89,63 @@ const createOutput = () => {
   }
 };
 
-const deleteSelected = () => {
-  if (map.selected.obj) {
-    objects = objects.filter(o => o !== map.selected.obj);
-    setSelected(null);
+const setSelected = (obj, type) => {
+  map.selected.obj = obj;
+  map.selected.type = type || (obj && obj.type) || map.selected.type;
+
+  if (obj) {
+    map.updateNodes();
   }
 };
 
-const createObject = obj => {
-  objectSchema.validate(obj, (err, _obj) => {
-    obj = err ? map.getNewObject() : _obj;
+const deleteSelected = () => {
+  
+  if (map.selected.obj) {
+    result[map.selected.obj.type].objects = result[map.selected.obj.type].objects.filter(o => o !== map.selected.obj);
+    objects = objects.filter(o => o !== map.selected.obj);
 
-    objects.push(obj);
-    
-    setSelected(obj);
-  });
+    setSelected(null);
+  }
+  // else if (map.selected.type) {
+  //   objects = objects.filter(o => o.type !== map.selected.type);
+  //   delete result[map.selected.type];
+  // }
 };
 
-const bindElement = (id, action) => {
-  const el = document.getElementById(id);
+const createObject = obj => {
+  obj = obj || map.getNewObject();
+  obj.type = obj.type || map.selected.type;
+
+  objects.push(obj);
+  result[obj.type].objects.push(obj);
+  
+  setSelected(obj);
+};
+
+const createType = () => {
+
+  const type = prompt('Enter a new object type:');
+
+  if (type) {
+    if (result[type]) {
+      alert('This object type already exists!');
+    } else {
+      result[type] = {
+        color: '#ffffff',
+        objects: [],
+      };
+
+      setSelected(null, type);
+    }
+  }
+};
+
+const bindElement = (elOrId, action) => {
+  const el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
   if (el) {
     action(el);
   } else {
-    console.error(`Invalid element id: ${id}`);
+    console.error(`Invalid element: ${elOrId}`);
   }
 };
 
@@ -196,18 +236,21 @@ p.setup = () => {
     grid: document.getElementById('grid'),
     output: document.getElementById('json-rep'),
     objectDialog: document.getElementById('object-dialog'),
-    // objectsMenu: document.getElementById('objects-menu'),
+    objectsMenu: document.getElementById('objects-menu'),
+    colorPicker: document.getElementById('color-object'),
   };
-
-  // ReactDOM.render(<ObjectsMenu result={result}/>, dom.objectsMenu);
 
   bindInput('input-snap', map.snap, val => {
     map.snap = parseInt(val, 10);
   });
   
   bindButton('btn-delete', deleteSelected);
-  bindButton('btn-create', () => createObject());
+  bindButton('btn-create-object', () => createObject());
   bindButton('btn-export', createOutput);
+  bindButton('btn-create-type', createType);
+  bindButton('btn-revert-color', () => {
+    delete map.selected.obj.color;
+  });
   bindButton('btn-import', () => {
     setSelected(null);
     
@@ -233,6 +276,7 @@ p.setup = () => {
         alert('Invalid object structure provided');
       } else {
         result = _result;
+        setSelected(null, getDefaultResult());
         dom.output.value = JSON.stringify(result);
       }
     });
@@ -245,15 +289,26 @@ p.setup = () => {
     createObject(copy);
   });
     
+  dom.colorPicker.value = null;
+  dom.colorPicker.oninput = e => {
+    const obj = map.selected.obj;
+    if (obj) {
+      obj.color = e.target.value;
+    }
+  };
+
   p.ellipseMode(p.RADIUS);
   p.textSize(20);
   p.textAlign(p.RIGHT, p.BOTTOM);
   p.colorMode(p.HSB, 255);
 
-  setSelected(null);
+  setSelected(null, getDefaultResult());
 };
 
 p.draw = () => {
+
+  // TEMP
+  dom.objectDialog.style.display = map.selected.obj ? 'flex' : 'none';
   
   // UPDATE
   map.updateCursor(p.mouseX, p.mouseY, objects);
@@ -276,11 +331,20 @@ p.draw = () => {
   p.translate(map.translate.x, map.translate.y);
   p.scale(map.translate.z);
 
-  map.render(p, objects);
+  map.render(p, objects, result);
   p.pop();
 
   p.fill(0);
   p.text(`(x: ${map.hover.rx}, y: ${map.hover.ry})`, p.width - 5, p.height - 5);
+
+  ReactDOM.render(
+    <ObjectsMenu
+      result={result}
+      selected={map.selected}
+      setSelected={setSelected}
+    />,
+    dom.objectsMenu,
+  );
 
 };
 

@@ -33,7 +33,6 @@
         <div class="left">
           <div class="dialog">
             <h3>Editor:</h3>                        
-            <button id="btn-create">Create Object</button>   
             <div class="input-group">
               <label>Snap:</label>
               <input type="number" id="input-snap"/>
@@ -56,12 +55,20 @@
         </div>  
         <div class="right">
           <div class="dialog">
+            <h3>Objects:</h3>
             <div id="objects-menu"></div>
+            <button id="btn-create-type">Create New Type</button>   
+            <button id="btn-create-object">Create Object</button>   
           </div>
           <div id="object-dialog" class="dialog">
             <h3>Object Settings:</h3>                        
             <button id="btn-delete">Delete Object</button>   
-            <button id="btn-duplicate">Duplicate Object</button>                                              
+            <button id="btn-duplicate">Duplicate Object</button> 
+            <div class="input-group">
+              <label>Color:</label>
+              <input type="color" id="color-object"/>                                
+            </div>  
+            <button id="btn-revert-color">Set color to parent</button>
           </div> 
         </div> 
       </div>
