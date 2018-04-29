@@ -2,18 +2,16 @@
   "name": "map_maker",
   "version": "1.0.0",
   "description": "Make maps and export to JSON",
-  "main": "index.js",
+  "author": "Wyatt Ades",
   "scripts": {
-    "build": "export NODE_ENV=production && node ./node_modules/webpack/bin/webpack.js --progress --profile --colors",
-    "dev": "export NODE_ENV=development && node server.js",
-    "deploy": "aws s3 cp dist s3://wyattades.com/map_maker --recursive"
+    "build": "export NODE_ENV=production && webpack --progress --profile --colors",
+    "dev": "export NODE_ENV=development && webpack-dev-server --colors",
+    "deploy": "gh-pages -d dist"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/wyattades/json_map_generator"
   },
-  "author": "Wyatt Ades",
-  "license": "MIT",
   "devDependencies": {
     "babel-core": "^6.26.0",
     "babel-eslint": "^7.2.3",
@@ -38,6 +36,7 @@
     "webpack-dev-server": "^2.7.1"
   },
   "dependencies": {
+    "gh-pages": "^1.1.0",
     "joi": "^10.6.0",
     "p5": "^0.5.12",
     "react": "^15.6.1",

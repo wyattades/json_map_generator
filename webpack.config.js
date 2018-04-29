@@ -56,6 +56,11 @@ const config = {
 
 if (process.env.NODE_ENV !== 'development') {
 
+  config.devServer = {
+    hot: true,
+    port: 8080,
+  };
+
   config.plugins.push(new UglifyJsPlugin({
     parallel: true,
   }));
